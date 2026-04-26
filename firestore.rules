@@ -75,13 +75,17 @@ service cloud.firestore {
     }
 
     function isValidJobApplication(data) {
-      return data.keys().hasAll(['userId', 'company', 'role', 'location', 'status', 'date']) &&
+      let baseValid = data.keys().hasAll(['userId', 'company', 'role', 'location', 'status', 'date']) &&
              data.userId == request.auth.uid &&
              data.company is string && data.company.size() > 0 && data.company.size() < 100 &&
              data.role is string && data.role.size() > 0 && data.role.size() < 100 &&
              data.location is string && data.location.size() < 100 &&
              data.status in ['applied', 'interviewing', 'offered', 'rejected'] &&
              isValidDate(data.date);
+      
+      let dueDateValid = !('dueDate' in data) || isValidDate(data.dueDate);
+      
+      return baseValid && dueDateValid;
     }
 
     // ===============================================================

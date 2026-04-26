@@ -36,7 +36,8 @@
         "role": { "type": "string" },
         "location": { "type": "string" },
         "status": { "type": "string", "enum": ["applied", "interviewing", "offered", "rejected"] },
-        "date": { "type": "string", "format": "date" }
+        "date": { "type": "string", "format": "date" },
+        "dueDate": { "type": "string", "format": "date" }
       },
       "required": ["userId", "company", "role", "status", "date"]
     }

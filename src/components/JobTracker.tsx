@@ -10,13 +10,14 @@ interface JobApplication {
   location: string;
   status: 'applied' | 'interviewing' | 'offered' | 'rejected';
   date: string;
+  dueDate?: string;
   userId: string;
 }
 
 export function JobTracker() {
   const [applications, setApplications] = useState<JobApplication[]>([]);
   const [isAdding, setIsAdding] = useState(false);
-  const [newApp, setNewApp] = useState({ company: '', role: '', location: '', status: 'applied' as const });
+  const [newApp, setNewApp] = useState({ company: '', role: '', location: '', status: 'applied' as const, dueDate: '' });
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -37,13 +38,21 @@ export function JobTracker() {
     if (!auth.currentUser) return;
 
     try {
-      await addDoc(collection(db, 'applications'), {
-        ...newApp,
+      const appData: any = {
+        company: newApp.company,
+        role: newApp.role,
+        location: newApp.location,
+        status: newApp.status,
         userId: auth.currentUser.uid,
         date: new Date().toISOString().split('T')[0]
-      });
+      };
+      if (newApp.dueDate) {
+        appData.dueDate = newApp.dueDate;
+      }
+      
+      await addDoc(collection(db, 'applications'), appData);
       setIsAdding(false);
-      setNewApp({ company: '', role: '', location: '', status: 'applied' });
+      setNewApp({ company: '', role: '', location: '', status: 'applied', dueDate: '' });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'applications');
     }
@@ -122,6 +131,15 @@ export function JobTracker() {
                   placeholder="e.g., Remote / New York"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Due Date (Optional)</label>
+                <input 
+                  type="date"
+                  value={newApp.dueDate}
+                  onChange={e => setNewApp({...newApp, dueDate: e.target.value})}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
               <div className="flex gap-4 pt-4">
                 <button 
                   type="button"
@@ -180,6 +198,11 @@ export function JobTracker() {
                     <div className="flex items-center gap-2 text-xs text-gray-400">
                       <Calendar className="w-3 h-3" /> {app.date}
                     </div>
+                    {app.dueDate && (
+                      <div className="flex items-center gap-2 text-xs font-bold text-emerald-600">
+                        <Clock className="w-3 h-3" /> Due: {app.dueDate}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex gap-2 pt-2 border-t border-gray-50">
