@@ -1,0 +1,121 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Global Safety Net (MANDATORY)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isAuthenticated() && request.auth.token.email_verified == true;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        (request.auth.token.email == "engineeringstudies5@gmail.com" && request.auth.token.email_verified == true) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin')
+      );
+    }
+    
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidTimestamp(ts) {
+      return ts is string && ts.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    function isValidDate(date) {
+      return date is string && date.matches("^\\d{4}-\\d{2}-\\d{2}$");
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'lastLogin', 'role']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             isValidTimestamp(data.lastLogin) &&
+             data.role in ['student', 'mentor', 'admin', 'employee'] &&
+             (data.get('displayName', '') is string) &&
+             (data.get('photoURL', '') is string);
+    }
+
+    function isValidAnalysis(data, userId) {
+      return data.keys().hasAll(['userId', 'fileName', 'result', 'timestamp']) &&
+             data.userId == userId &&
+             data.userId == request.auth.uid &&
+             data.fileName is string && data.fileName.size() < 255 &&
+             data.result is string && data.result.size() < 100000 &&
+             isValidTimestamp(data.timestamp);
+    }
+
+    function isValidJobApplication(data) {
+      return data.keys().hasAll(['userId', 'company', 'role', 'location', 'status', 'date']) &&
+             data.userId == request.auth.uid &&
+             data.company is string && data.company.size() > 0 && data.company.size() < 100 &&
+             data.role is string && data.role.size() > 0 && data.role.size() < 100 &&
+             data.location is string && data.location.size() < 100 &&
+             data.status in ['applied', 'interviewing', 'offered', 'rejected'] &&
+             isValidDate(data.date);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      
+      allow create: if isVerified() && isOwner(userId) && isValidUser(request.resource.data) && 
+                    (request.resource.data.role in ['student', 'employee'] || isAdmin());
+      
+      allow update: if isVerified() && isOwner(userId) && (
+        isAdmin() || (
+          isValidUser(request.resource.data) && 
+          request.resource.data.role == resource.data.role &&
+          request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastLogin', 'displayName', 'photoURL'])
+        )
+      );
+      
+      match /analyses/{analysisId} {
+        allow read: if isOwner(userId);
+        allow create: if isVerified() && isOwner(userId) && isValidAnalysis(request.resource.data, userId);
+        allow update: if false; 
+        allow delete: if isOwner(userId);
+      }
+    }
+
+    match /applications/{applicationId} {
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow create: if isVerified() && isValidJobApplication(request.resource.data);
+      allow update: if isVerified() && isDocOwner() && isValidJobApplication(request.resource.data);
+      allow delete: if isVerified() && isDocOwner();
+    }
+  }
+}

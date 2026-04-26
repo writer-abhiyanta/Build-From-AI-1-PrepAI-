@@ -1,0 +1,58 @@
+{
+  "entities": {
+    "user": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["student", "mentor", "admin", "employee"] },
+        "lastLogin": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role", "lastLogin"]
+    },
+    "resumeAnalysis": {
+      "title": "Resume Analysis",
+      "description": "Stored resume analysis results",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "fileName": { "type": "string" },
+        "result": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "result", "timestamp"]
+    },
+    "jobApplication": {
+      "title": "Job Application",
+      "description": "Tracked job application",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "company": { "type": "string" },
+        "role": { "type": "string" },
+        "location": { "type": "string" },
+        "status": { "type": "string", "enum": ["applied", "interviewing", "offered", "rejected"] },
+        "date": { "type": "string", "format": "date" }
+      },
+      "required": ["userId", "company", "role", "status", "date"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "user",
+      "description": "User profiles"
+    },
+    "/users/{userId}/analyses/{analysisId}": {
+      "schema": "resumeAnalysis",
+      "description": "User's resume analysis history"
+    },
+    "/applications/{applicationId}": {
+      "schema": "jobApplication",
+      "description": "Job applications tracked by users"
+    }
+  }
+}
