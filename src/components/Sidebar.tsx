@@ -1,4 +1,4 @@
-import { Briefcase, FileText, LayoutDashboard, MessageSquare, Code, LogOut, User as UserIcon, Image as ImageIcon, MessageCircle, Sparkles, Kanban } from 'lucide-react';
+import { Briefcase, FileText, LayoutDashboard, MessageSquare, Code, LogOut, User as UserIcon, MessageCircle, Sparkles, Kanban, Star, Compass } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { logout } from '../lib/firebase';
 
@@ -12,14 +12,16 @@ interface SidebarProps {
 export function Sidebar({ activeTab, setActiveTab, user, role }: SidebarProps) {
   const navItems = [
     { id: 'home', label: 'Dashboard', icon: LayoutDashboard, roles: ['student', 'mentor', 'admin', 'employee'] },
-    { id: 'chat', label: 'AI Mentor', icon: MessageCircle, roles: ['student', 'mentor', 'admin', 'employee'] },
-    { id: 'interview', label: 'Interview Practice', icon: MessageSquare, roles: ['student', 'mentor', 'admin', 'employee'] },
-    { id: 'tracker', label: 'Placement Tracker', icon: Kanban, roles: ['student', 'mentor', 'admin', 'employee'] },
+    { id: 'chat', label: 'AI Mentor', icon: MessageCircle, roles: ['student', 'mentor', 'admin'] },
+    { id: 'skillgap', label: 'Skill Gap Analyzer', icon: Compass, roles: ['student', 'mentor', 'admin', 'employee'] },
+    { id: 'stories', label: 'STAR Story Vault', icon: Star, roles: ['student', 'mentor', 'admin', 'employee'] },
+    { id: 'interview', label: 'Interview Practice', icon: MessageSquare, roles: ['student', 'employee', 'admin'] },
+    { id: 'tracker', label: 'Placement Tracker', icon: Kanban, roles: ['student', 'admin', 'employee'] },
     { id: 'analyzer', label: 'Resume Analyzer', icon: FileText, roles: ['student', 'mentor', 'admin', 'employee'] },
-    { id: 'builder', label: 'Resume Builder', icon: Briefcase, roles: ['student', 'mentor', 'admin', 'employee'] },
-    { id: 'project', label: 'Project Builder', icon: Code, roles: ['student', 'mentor', 'admin', 'employee'] },
-    { id: 'tools', label: 'Career Suite', icon: Sparkles, roles: ['student', 'mentor', 'admin', 'employee'] },
-    { id: 'report', label: 'Build Report', icon: FileText, roles: ['admin'] },
+    { id: 'builder', label: 'Resume Builder', icon: Briefcase, roles: ['student', 'employee', 'admin'] },
+    { id: 'project', label: 'Project Builder', icon: Code, roles: ['student', 'employee', 'admin'] },
+    { id: 'tools', label: 'Career Suite', icon: Sparkles, roles: ['student', 'employee', 'admin'] },
+    { id: 'report', label: 'Software Workflow', icon: FileText, roles: ['admin', 'mentor'] },
   ];
 
   const filteredNavItems = navItems.filter(item => !role || item.roles.includes(role));
@@ -80,13 +82,7 @@ export function Sidebar({ activeTab, setActiveTab, user, role }: SidebarProps) {
           </div>
         )}
         
-        <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-5 text-white shadow-lg shadow-emerald-500/20">
-          <h3 className="font-bold text-sm">Pro Features</h3>
-          <p className="text-xs text-emerald-50 mt-1 opacity-90">Unlock advanced AI capabilities</p>
-          <button className="mt-4 w-full bg-white text-emerald-700 text-xs font-bold py-2.5 rounded-xl hover:bg-emerald-50 transition-colors">
-            Upgrade Now
-          </button>
-        </div>
+
 
         <button 
           onClick={() => logout()}

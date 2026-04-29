@@ -10,6 +10,7 @@
         "displayName": { "type": "string" },
         "photoURL": { "type": "string" },
         "role": { "type": "string", "enum": ["student", "mentor", "admin", "employee"] },
+        "subscriptionStatus": { "type": "string", "enum": ["active", "inactive"] },
         "lastLogin": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "email", "role", "lastLogin"]

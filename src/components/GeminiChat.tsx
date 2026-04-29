@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, User, Bot, Loader2, MessageSquare, Trash2, Lock } from 'lucide-react';
-import { createChatSession } from '../lib/gemini';
+import { sendChatMessage } from '../lib/gemini';
 import Markdown from 'react-markdown';
 
 declare global {
@@ -24,7 +24,6 @@ export function GeminiChat() {
   const [model, setModel] = useState('gemini-3-flash-preview');
   const [hasKey, setHasKey] = useState<boolean | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const chatSessionRef = useRef<any>(null);
 
   const systemInstruction = "You are a Senior Director and Strategic Career Mentor. You help students and professionals with high-level career strategy, leadership development, and positioning themselves for impact. Be professional, direct, and insightful.";
 
@@ -40,15 +39,10 @@ export function GeminiChat() {
     checkKey();
   }, []);
 
-  useEffect(() => {
-    chatSessionRef.current = createChatSession(systemInstruction, model);
-  }, [model]);
-
   const handleSelectKey = async () => {
     if (window.aistudio?.openSelectKey) {
       await window.aistudio.openSelectKey();
       setHasKey(true);
-      chatSessionRef.current = createChatSession(systemInstruction, model);
     }
   };
 
@@ -62,22 +56,18 @@ export function GeminiChat() {
     if (!input.trim() || isLoading) return;
 
     const userMessage: Message = { role: 'user', content: input };
-    setMessages(prev => [...prev, userMessage]);
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
     setInput('');
     setIsLoading(true);
 
     try {
-      const response = await chatSessionRef.current.sendMessage({ message: input });
+      const response = await sendChatMessage(newMessages, systemInstruction, model);
       const modelMessage: Message = { role: 'model', content: response.text };
       setMessages(prev => [...prev, modelMessage]);
     } catch (error: any) {
       console.error("Chat error:", error);
-      if (error.message?.includes("Requested entity was not found") || error.message?.includes("PERMISSION_DENIED")) {
-        setHasKey(false);
-        setMessages(prev => [...prev, { role: 'model', content: "This model requires a paid API key. Please select one using the button above to continue." }]);
-      } else {
-        setMessages(prev => [...prev, { role: 'model', content: "Sorry, I encountered an error. Please try again." }]);
-      }
+      setMessages(prev => [...prev, { role: 'model', content: "Sorry, I encountered an error. Please try again or check if you have reached a quota limit." }]);
     } finally {
       setIsLoading(false);
     }
@@ -85,7 +75,6 @@ export function GeminiChat() {
 
   const clearChat = () => {
     setMessages([]);
-    chatSessionRef.current = createChatSession(systemInstruction, model);
   };
 
   return (
@@ -103,22 +92,13 @@ export function GeminiChat() {
         </div>
         
         <div className="flex items-center gap-4">
-          {!hasKey && hasKey !== null && (
-            <button 
-              onClick={handleSelectKey}
-              className="flex items-center gap-2 bg-amber-100 text-amber-700 px-3 py-1.5 rounded-lg text-xs font-bold border border-amber-200 hover:bg-amber-200 transition-all"
-            >
-              <Lock className="w-3 h-3" />
-              Select Paid Key
-            </button>
-          )}
           <select 
             value={model} 
             onChange={(e) => setModel(e.target.value)}
             className="text-sm border border-emerald-200 rounded-lg px-3 py-1.5 bg-white text-emerald-800 outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-medium"
           >
             <option value="gemini-3-flash-preview">General (Flash)</option>
-            <option value="gemini-3.1-pro-preview">Complex (Pro)</option>
+            <option value="gemini-3.1-pro-preview">Complex Model</option>
             <option value="gemini-3.1-flash-lite-preview">Fast (Lite)</option>
           </select>
           <button 

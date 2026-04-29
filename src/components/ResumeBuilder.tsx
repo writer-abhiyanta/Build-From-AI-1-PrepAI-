@@ -1,7 +1,14 @@
-import { useState } from 'react';
-import { Loader2, Download, Copy, Check } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Loader2, Download, Copy, Check, FileDown } from 'lucide-react';
 import { generateText } from '../lib/gemini';
 import Markdown from 'react-markdown';
+import pdfMake from 'pdfmake/build/pdfmake';
+import * as pdfFonts from 'pdfmake/build/vfs_fonts';
+import htmlToPdfmake from 'html-to-pdfmake';
+import { marked } from 'marked';
+
+const fonts = (pdfFonts as any).default || pdfFonts;
+(pdfMake as any).vfs = fonts?.pdfMake?.vfs || fonts?.vfs || (window as any).pdfMake?.vfs;
 
 export function ResumeBuilder() {
   const [formData, setFormData] = useState({
@@ -17,6 +24,9 @@ export function ResumeBuilder() {
   const [result, setResult] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  
+  const resumeRef = useRef<HTMLDivElement>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -68,6 +78,41 @@ export function ResumeBuilder() {
       navigator.clipboard.writeText(result);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!result) return;
+    setIsDownloading(true);
+    
+    try {
+      // Convert markdown to HTML
+      const htmlText = await marked.parse(result);
+      
+      // Convert HTML to pdfmake format using a temporary window element or just passing string
+      // htmlToPdfmake can take a string if window is provided
+      const val = htmlToPdfmake(htmlText, { window: window as any });
+      
+      const docDefinition = {
+        content: val,
+        defaultStyle: {
+          font: 'Roboto',
+          fontSize: 10,
+          color: '#333333'
+        },
+        styles: {
+          // You can map HTML tags/classes to pdfmake styles here if needed.
+          // html-to-pdfmake handles a lot out of the box.
+        }
+      };
+      
+      const filename = `${formData.name ? formData.name.replace(/\s+/g, '_') : 'resume'}.pdf`;
+      pdfMake.createPdf(docDefinition).download(filename);
+    } catch (error) {
+      console.error("PDF Generation failed", error);
+      alert("Failed to generate PDF. Check console for details.");
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -137,7 +182,20 @@ export function ResumeBuilder() {
             <h3 className="text-xl font-semibold text-gray-900">Generated Resume</h3>
             {result && (
               <div className="flex gap-2">
-                <button onClick={handleCopy} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="Copy Markdown">
+                <button 
+                  onClick={handleDownloadPdf} 
+                  disabled={isDownloading}
+                  className="p-2 text-gray-600 hover:bg-emerald-50 hover:text-emerald-600 rounded-lg transition-colors flex items-center gap-2" 
+                  title="Download as PDF"
+                >
+                  {isDownloading ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileDown className="w-5 h-5" />}
+                  <span className="text-sm font-medium hidden sm:inline">Download PDF</span>
+                </button>
+                <button 
+                  onClick={handleCopy} 
+                  className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex items-center gap-2" 
+                  title="Copy Markdown"
+                >
                   {copied ? <Check className="w-5 h-5 text-emerald-600" /> : <Copy className="w-5 h-5" />}
                 </button>
               </div>
@@ -151,7 +209,7 @@ export function ResumeBuilder() {
                 <p>Crafting your perfect resume...</p>
               </div>
             ) : result ? (
-              <div className="markdown-body prose prose-sm max-w-none">
+              <div ref={resumeRef} className="markdown-body prose prose-sm max-w-none p-4 bg-white">
                 <Markdown>{result}</Markdown>
               </div>
             ) : (

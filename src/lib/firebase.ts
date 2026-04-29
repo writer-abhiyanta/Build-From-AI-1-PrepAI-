@@ -6,7 +6,7 @@ import firebaseConfig from '../../firebase-applet-config.json';
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const signInWithGoogle = async (preferredRole: 'student' | 'employee' = 'student') => {
+export const signInWithGoogle = async (preferredRole: 'student' | 'employee' | 'mentor' | 'admin' = 'student') => {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
   
@@ -19,17 +19,17 @@ export const signInWithGoogle = async (preferredRole: 'student' | 'employee' = '
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       let role: string = preferredRole;
       
-      if (userDoc.exists()) {
-        role = userDoc.data().role || preferredRole;
-      } else if (user.email === "engineeringstudies5@gmail.com") {
+      if (user.email === "engineeringstudies5@gmail.com") {
         role = 'admin';
+      } else if (userDoc.exists()) {
+        role = userDoc.data().role || preferredRole;
       }
 
       await setDoc(doc(db, 'users', user.uid), {
         uid: user.uid,
-        email: user.email,
-        displayName: user.displayName,
-        photoURL: user.photoURL,
+        email: user.email || '',
+        displayName: user.displayName || '',
+        photoURL: user.photoURL || '',
         role: role,
         lastLogin: new Date().toISOString()
       }, { merge: true });
@@ -104,7 +104,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
       emailVerified: auth.currentUser?.emailVerified,
       isAnonymous: auth.currentUser?.isAnonymous,
       tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
+      providerInfo: auth.currentUser?.providerData?.map((provider: any) => ({
         providerId: provider.providerId,
         displayName: provider.displayName,
         email: provider.email,

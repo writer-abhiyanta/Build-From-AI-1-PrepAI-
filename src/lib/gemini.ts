@@ -13,10 +13,10 @@ export async function generateText(prompt: string, systemInstruction?: string, m
 
 export async function generateStructuredFeedback(prompt: string) {
   const response = await ai.models.generateContent({
-    model: "gemini-3.1-pro-preview",
+    model: "gemini-3-flash-preview",
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     config: {
-      systemInstruction: "You are an expert interview coach acting as a Senior Hiring Manager. Analyze the user's response to an interview question. Provide feedback in a strict JSON format focusing on Content, Tone, and Clarity.",
+      systemInstruction: "You are an expert interview coach acting as a Senior Hiring Manager. Analyze the user's response to an interview question. Provide feedback in a strict JSON format focusing on Content, Tone, Clarity, and specific common mistakes like filler words, STAR method usage, and example clarity.",
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
@@ -46,15 +46,40 @@ export async function generateStructuredFeedback(prompt: string) {
             },
             required: ["score", "analysis"]
           },
+          fillerWords: {
+             type: Type.OBJECT,
+             properties: {
+               count: { type: Type.NUMBER },
+               examples: { type: Type.ARRAY, items: { type: Type.STRING } },
+               analysis: { type: Type.STRING }
+             },
+             required: ["count", "examples", "analysis"]
+          },
+          starMethod: {
+             type: Type.OBJECT,
+             properties: {
+               used: { type: Type.BOOLEAN },
+               analysis: { type: Type.STRING }
+             },
+             required: ["used", "analysis"]
+          },
+          examples: {
+             type: Type.OBJECT,
+             properties: {
+               clarity: { type: Type.STRING },
+               advice: { type: Type.STRING }
+             },
+             required: ["clarity", "advice"]
+          },
           actionableTip: { type: Type.STRING }
         },
-        required: ["content", "tone", "clarity", "actionableTip"]
+        required: ["content", "tone", "clarity", "fillerWords", "starMethod", "examples", "actionableTip"]
       }
     }
   });
   
   try {
-    return JSON.parse(response.text);
+    return JSON.parse(response.text || '{}');
   } catch (e) {
     console.error("Failed to parse AI feedback JSON:", e);
     return null;
@@ -82,16 +107,23 @@ export async function analyzeResume(fileBase64: string, mimeType: string) {
   return response.text;
 }
 
-export function createChatSession(systemInstruction: string, model: string = "gemini-3-flash-preview") {
-  return ai.chats.create({
-    model: model,
-    config: { systemInstruction }
+export async function sendChatMessage(messages: any[], systemInstruction?: string, model: string = "gemini-3-flash-preview") {
+  const contents = messages.map((m: any) => ({
+    role: m.role,
+    parts: [{ text: m.content || m.text }]
+  }));
+
+  const response = await ai.models.generateContent({
+     model: model,
+     contents: contents,
+     config: systemInstruction ? { systemInstruction } : undefined,
   });
+
+  return { text: response.text };
 }
 
 export async function generateImage(prompt: string, size: "1K" | "2K" | "4K" = "1K") {
-  // Create a new instance right before the call to use the latest selected API key
-  const imageAi = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
+  const imageAi = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY! });
   
   const response = await imageAi.models.generateContent({
     model: "gemini-3.1-flash-image-preview",
@@ -106,7 +138,6 @@ export async function generateImage(prompt: string, size: "1K" | "2K" | "4K" = "
     }
   });
   
-  // Find the image part in the response
   for (const part of response.candidates?.[0]?.content?.parts || []) {
     if (part.inlineData) {
       return { data: part.inlineData.data };
@@ -115,3 +146,5 @@ export async function generateImage(prompt: string, size: "1K" | "2K" | "4K" = "
   
   return null;
 }
+
+

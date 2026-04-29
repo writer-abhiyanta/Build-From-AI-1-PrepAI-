@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, User, Bot, Loader2, Sparkles, ChevronDown, ChevronUp, CheckCircle, AlertCircle, BarChart, Quote, Zap } from 'lucide-react';
-import { createChatSession, generateText, generateStructuredFeedback } from '../lib/gemini';
+import { Send, User, Bot, Loader2, Sparkles, ChevronDown, ChevronUp, CheckCircle, AlertCircle, BarChart, Quote, Zap, AlertTriangle, Star, MessageSquare } from 'lucide-react';
+import { sendChatMessage, generateText, generateStructuredFeedback } from '../lib/gemini';
 import Markdown from 'react-markdown';
 
 interface FeedbackData {
@@ -16,6 +16,19 @@ interface FeedbackData {
   clarity: {
     score: number;
     analysis: string;
+  };
+  fillerWords?: {
+    count: number;
+    examples: string[];
+    analysis: string;
+  };
+  starMethod?: {
+    used: boolean;
+    analysis: string;
+  };
+  examples?: {
+    clarity: string;
+    advice: string;
   };
   actionableTip: string;
 }
@@ -42,6 +55,9 @@ export function InterviewPractice() {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
+  const [totalQuestions, setTotalQuestions] = useState(5);
+  const questionsAsked = Math.max(0, Math.floor((messages.length - 1) / 2));
+  
   const personas = {
     'Hiring Manager': 'You are a Senior Hiring Manager looking for leadership potential, strategic thinking, and emotional intelligence. Your questions are open-ended and focus on how the user handles complex situations, conflicts, and decision-making.',
     'Technical Lead': 'You are a Senior Technical Lead. You focus on technical depth, architecture, code quality, and how the user solves difficult engineering problems.',
@@ -49,13 +65,9 @@ export function InterviewPractice() {
     'Standard': 'You are an expert technical and behavioral interviewer. Keep the tone professional, encouraging, and helpful.'
   };
 
-  // We use a ref to store the chat session so it persists across renders
-  const chatSessionRef = useRef<any>(null);
-
   useEffect(() => {
-    chatSessionRef.current = createChatSession(
-      `${personas[persona as keyof typeof personas]} Ask one question at a time. Wait for the user's response. After they respond, provide constructive feedback on their answer, and then ask the next question.`
-    );
+    // When persona changes, we just let the next handledSend know the systemInstruction
+    // No need to create a chat session locally
   }, [persona]);
 
   const scrollToBottom = () => {
@@ -69,16 +81,21 @@ export function InterviewPractice() {
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
+    const personaInstruction = personas[persona as keyof typeof personas] || personas['Standard'];
+    const systemInstruction = `${personaInstruction} You are conducting an interview with a total of ${totalQuestions} questions. You have asked ${questionsAsked} questions so far (not counting the initial role inquiry). Ask one question at a time. Wait for the user's response. After they respond, provide constructive feedback on their answer, and then ask the next question. If you have reached ${totalQuestions} questions, conclude the interview and offer a final summary.`;
+
     const userMessage = input.trim();
     setInput('');
     const userMsgId = Date.now().toString();
-    setMessages(prev => [...prev, { id: userMsgId, role: 'user', text: userMessage }]);
+    const newUserMsg: Message = { id: userMsgId, role: 'user', text: userMessage };
+    const newMessagesList = [...messages, newUserMsg];
+    setMessages(newMessagesList);
     setIsLoading(true);
 
     try {
-      if (!chatSessionRef.current) return;
-      
-      const result = await chatSessionRef.current.sendMessage({ message: userMessage });
+      // Map to Gemini chat format
+      const geminiMessages = newMessagesList.map(m => ({ role: m.role, content: m.text }));
+      const result = await sendChatMessage(geminiMessages, systemInstruction);
       
       setMessages(prev => [...prev, { 
         id: (Date.now() + 1).toString(), 
@@ -119,29 +136,69 @@ export function InterviewPractice() {
 
   return (
     <div className="max-w-4xl mx-auto h-[calc(100vh-4rem)] flex flex-col bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="p-6 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Interview Practice</h2>
-          <p className="text-gray-600 mt-1">Chat with our AI to improve your interview skills.</p>
+      <div className="p-6 border-b border-gray-200 bg-gray-50 flex flex-col gap-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Interview Practice</h2>
+            <p className="text-gray-600 mt-1">Chat with our AI to improve your interview skills.</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex flex-col items-end">
+              <label className="text-xs font-black text-emerald-900 uppercase tracking-widest mb-1.5">Questions:</label>
+              <select 
+                value={totalQuestions}
+                onChange={(e) => setTotalQuestions(Number(e.target.value))}
+                className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+              >
+                <option value={3}>3 Questions</option>
+                <option value={5}>5 Questions</option>
+                <option value={10}>10 Questions</option>
+              </select>
+            </div>
+            <div className="flex flex-col items-end">
+              <label className="text-xs font-black text-emerald-900 uppercase tracking-widest mb-1.5">Persona:</label>
+              <select 
+                value={persona}
+                onChange={(e) => {
+                  setPersona(e.target.value);
+                  setMessages([{
+                    id: Date.now().toString(),
+                    role: 'model',
+                    text: `I've switched my persona to **${e.target.value}**. Let's continue or start a new session. What role are we focusing on?`
+                  }]);
+                }}
+                className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+              >
+                {Object.keys(personas).map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <label className="text-xs font-black text-emerald-900 uppercase tracking-widest">Interviewer Persona:</label>
-          <select 
-            value={persona}
-            onChange={(e) => {
-              setPersona(e.target.value);
-              setMessages([{
-                id: Date.now().toString(),
-                role: 'model',
-                text: `I've switched my persona to **${e.target.value}**. Let's continue or start a new session. What role are we focusing on?`
-              }]);
-            }}
-            className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-          >
-            {Object.keys(personas).map(p => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
+
+        {/* Progress Bar */}
+        <div className="w-full bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
+          <div className="flex-1">
+            <div className="flex justify-between text-xs font-bold text-gray-600 mb-2 uppercase tracking-wide">
+              <span>Interview Progress</span>
+              <span className="text-emerald-600">{Math.min(questionsAsked, totalQuestions)} / {totalQuestions} Questions</span>
+            </div>
+            <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden border border-gray-200/50">
+              <div 
+                className="h-full bg-emerald-500 rounded-full transition-all duration-700 ease-out relative overflow-hidden"
+                style={{ width: `${(Math.min(questionsAsked, totalQuestions) / totalQuestions) * 100}%` }}
+              >
+                <div className="absolute inset-0 bg-white/20 w-full" />
+              </div>
+            </div>
+          </div>
+          {questionsAsked >= totalQuestions && (
+            <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100">
+              <CheckCircle className="w-4 h-4" />
+              <span className="text-xs font-bold uppercase tracking-wider">Complete</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -254,6 +311,66 @@ export function InterviewPractice() {
                         </div>
                       </div>
 
+                      {/* Granular Feedback */}
+                      {((msg.feedback as FeedbackData).fillerWords || (msg.feedback as FeedbackData).starMethod || (msg.feedback as FeedbackData).examples) && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
+                          {/* Filler Words */}
+                          {(msg.feedback as FeedbackData).fillerWords && (
+                            <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-rose-600 font-bold text-xs uppercase tracking-wider">
+                                  <AlertTriangle className="w-4 h-4" />
+                                  Filler Words
+                                </div>
+                                <span className={`text-xs font-black px-2 py-1 rounded-md ${(msg.feedback as FeedbackData).fillerWords!.count > 3 ? 'bg-rose-100 text-rose-700' : 'bg-green-100 text-green-700'}`}>
+                                  Count: {(msg.feedback as FeedbackData).fillerWords!.count}
+                                </span>
+                              </div>
+                              <p className="text-xs leading-relaxed text-slate-600">{(msg.feedback as FeedbackData).fillerWords!.analysis}</p>
+                              {(msg.feedback as FeedbackData).fillerWords!.examples.length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                  {(msg.feedback as FeedbackData).fillerWords!.examples.map((fw, i) => (
+                                    <span key={i} className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200">
+                                      {fw}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* STAR Method */}
+                          {(msg.feedback as FeedbackData).starMethod && (
+                            <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-indigo-600 font-bold text-xs uppercase tracking-wider">
+                                  <Star className="w-4 h-4" />
+                                  STAR Method
+                                </div>
+                                <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${(msg.feedback as FeedbackData).starMethod!.used ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
+                                  {(msg.feedback as FeedbackData).starMethod!.used ? 'Used' : 'Not Used'}
+                                </span>
+                              </div>
+                              <p className="text-xs leading-relaxed text-slate-600">{(msg.feedback as FeedbackData).starMethod!.analysis}</p>
+                            </div>
+                          )}
+
+                          {/* Examples */}
+                          {(msg.feedback as FeedbackData).examples && (
+                            <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-3">
+                              <div className="flex items-center gap-2 text-teal-600 font-bold text-xs uppercase tracking-wider">
+                                <MessageSquare className="w-4 h-4" />
+                                Example Quality
+                              </div>
+                              <p className="text-xs leading-relaxed text-slate-600">{(msg.feedback as FeedbackData).examples!.clarity}</p>
+                              <div className="p-2 bg-teal-50 rounded-lg text-[10px] text-teal-700 border border-teal-100 font-medium">
+                                👉 {(msg.feedback as FeedbackData).examples!.advice}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {/* Actionable Tip */}
                       <div className="bg-emerald-600 p-4 rounded-2xl text-white shadow-lg shadow-emerald-600/20 group hover:scale-[1.02] transition-transform duration-300">
                         <div className="flex items-start gap-4">
@@ -261,7 +378,7 @@ export function InterviewPractice() {
                             <Zap className="w-5 h-5 text-white shadow-glow" />
                           </div>
                           <div>
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Pro Tip for Next Time</span>
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Expert Tip for Next Time</span>
                             <p className="text-sm font-bold mt-1 text-emerald-50 leading-snug">
                               {(msg.feedback as FeedbackData).actionableTip}
                             </p>

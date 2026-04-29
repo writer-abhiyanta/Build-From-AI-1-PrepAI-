@@ -7,7 +7,8 @@ import { ResumeBuilder } from './components/ResumeBuilder';
 import { ProjectBuilder } from './components/ProjectBuilder';
 import { Report } from './components/Report';
 import { GeminiChat } from './components/GeminiChat';
-import { ImageGenerator } from './components/ImageGenerator';
+import { StoryVault } from './components/StoryVault';
+import { SkillGapAnalyzer } from './components/SkillGapAnalyzer';
 import { CareerTools } from './components/CareerTools';
 import { JobTracker } from './components/JobTracker';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -20,6 +21,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<string | null>(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -41,17 +43,21 @@ export default function App() {
         unsubDoc = onSnapshot(userDocRef, (doc) => {
           if (doc.exists()) {
             setRole(doc.data().role);
+            setSubscriptionStatus(doc.data().subscriptionStatus || 'inactive');
           } else {
             setRole('student');
+            setSubscriptionStatus('inactive');
           }
           setLoading(false);
         }, (error) => {
           console.error("Error fetching user role:", error);
           setRole('student'); // Fallback on error
+          setSubscriptionStatus('inactive');
           setLoading(false);
         });
       } else {
         setRole(null);
+        setSubscriptionStatus(null);
         setLoading(false);
       }
     });
@@ -62,7 +68,7 @@ export default function App() {
     };
   }, []);
 
-  const handleSignIn = async (preferredRole: 'student' | 'employee' = 'student') => {
+  const handleSignIn = async (preferredRole: 'student' | 'employee' | 'mentor' | 'admin' = 'student') => {
     if (isSigningIn) return;
     
     setIsSigningIn(true);
@@ -172,6 +178,40 @@ export default function App() {
                 )}
                 {isSigningIn ? 'Signing in...' : 'Login as Employee'}
               </button>
+
+              <button 
+                onClick={() => handleSignIn('mentor')}
+                disabled={isSigningIn}
+                className="w-full relative overflow-hidden flex items-center justify-center gap-4 bg-gradient-to-r from-emerald-600 to-teal-600 border-2 border-transparent py-4 rounded-2xl font-bold text-white hover:shadow-lg hover:shadow-emerald-500/30 hover:-translate-y-0.5 transition-all duration-300 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed group"
+              >
+                <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/30 to-transparent group-hover:animate-[shimmer_1.5s_infinite]" />
+                <style>{`
+                  @keyframes shimmer {
+                    100% { transform: translateX(100%); }
+                  }
+                `}</style>
+                {isSigningIn ? (
+                  <Loader2 className="w-6 h-6 animate-spin text-white" />
+                ) : (
+                  <div className="bg-white p-1 rounded-full bg-opacity-90">
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5 block" />
+                  </div>
+                )}
+                <span className="relative z-10">{isSigningIn ? 'Signing in...' : 'Login as Mentor'}</span>
+              </button>
+
+              <button 
+                onClick={() => handleSignIn('admin')}
+                disabled={isSigningIn}
+                className="w-full flex items-center justify-center gap-4 bg-white border-2 border-slate-200 py-4 rounded-2xl font-bold text-gray-700 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSigningIn ? (
+                  <Loader2 className="w-6 h-6 animate-spin text-slate-600" />
+                ) : (
+                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-6 h-6" />
+                )}
+                {isSigningIn ? 'Signing in...' : 'Login as Admin'}
+              </button>
             </div>
 
             {authError && (
@@ -195,19 +235,59 @@ export default function App() {
     );
   }
 
+  const isOwner = user?.email === 'engineeringstudies5@gmail.com';
+
+  const navItemRoles: Record<string, string[]> = {
+    home: ['student', 'mentor', 'admin', 'employee'],
+    chat: ['student', 'mentor', 'admin'],
+    skillgap: ['student', 'mentor', 'admin', 'employee'],
+    stories: ['student', 'mentor', 'admin', 'employee'],
+    interview: ['student', 'employee', 'admin'],
+    tracker: ['student', 'admin', 'employee'],
+    analyzer: ['student', 'mentor', 'admin', 'employee'],
+    builder: ['student', 'employee', 'admin'],
+    project: ['student', 'employee', 'admin'],
+    tools: ['student', 'employee', 'admin'],
+    report: ['admin', 'mentor']
+  };
+
+  const roleValue = role || 'student';
+  const currentTabAllowed = navItemRoles[activeTab]?.includes(roleValue);
+
+  if (!currentTabAllowed) {
+    return (
+      <div className="flex h-screen bg-gray-50 text-gray-900 font-sans">
+        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} user={user} role={role} />
+        <main className="flex-1 overflow-y-auto p-8 flex flex-col items-center justify-center">
+          <div className="text-center p-12 bg-white rounded-3xl border border-red-100 shadow-sm max-w-lg">
+            <h2 className="text-3xl font-black text-gray-900 mb-4">Access Denied</h2>
+            <p className="text-gray-500 mb-8">You don't have permission to view this section with your current role ({roleValue}).</p>
+            <button 
+              onClick={() => setActiveTab('home')}
+              className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-700 transition"
+            >
+              Return Home
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <div className="flex h-screen bg-gray-50 text-gray-900 font-sans">
         <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} user={user} role={role} />
         <main className="flex-1 overflow-y-auto p-8">
-          {activeTab === 'home' && <Home setActiveTab={setActiveTab} />}
+          {activeTab === 'home' && <Home setActiveTab={setActiveTab} role={role} />}
           {activeTab === 'chat' && <GeminiChat />}
+          {activeTab === 'skillgap' && <SkillGapAnalyzer />}
+          {activeTab === 'stories' && <StoryVault />}
           {activeTab === 'interview' && <InterviewPractice />}
           {activeTab === 'tracker' && <JobTracker />}
           {activeTab === 'analyzer' && <ResumeAnalyzer />}
           {activeTab === 'builder' && <ResumeBuilder />}
           {activeTab === 'project' && <ProjectBuilder />}
-          {activeTab === 'images' && <ImageGenerator />}
           {activeTab === 'tools' && <CareerTools />}
           {activeTab === 'report' && <Report />}
         </main>

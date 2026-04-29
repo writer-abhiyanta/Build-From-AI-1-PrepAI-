@@ -1,18 +1,29 @@
-import { ArrowRight, MessageSquare, FileText, Briefcase, Code, Sparkles, Kanban } from 'lucide-react';
+import { ArrowRight, MessageSquare, FileText, Briefcase, Code, Sparkles, Kanban, MessageCircle, Star, Compass } from 'lucide-react';
 
 interface HomeProps {
   setActiveTab: (tab: string) => void;
+  role: string | null;
 }
 
-export function Home({ setActiveTab }: HomeProps) {
-  const features = [
+export function Home({ setActiveTab, role }: HomeProps) {
+  const allFeatures = [
+    {
+      id: 'chat',
+      title: 'AI Mentor',
+      description: 'Get high-level career strategy and leadership development from your AI mentor.',
+      icon: MessageCircle,
+      color: 'bg-purple-500',
+      shadow: 'shadow-purple-500/30',
+      roles: ['student', 'mentor', 'admin']
+    },
     {
       id: 'interview',
       title: 'Interview Practice',
       description: 'Practice your interview skills with our AI interviewer. Get real-time feedback and tips.',
       icon: MessageSquare,
       color: 'bg-teal-500',
-      shadow: 'shadow-teal-500/30'
+      shadow: 'shadow-teal-500/30',
+      roles: ['student', 'employee', 'admin']
     },
     {
       id: 'tracker',
@@ -20,7 +31,8 @@ export function Home({ setActiveTab }: HomeProps) {
       description: 'Manage and track your job applications, interviews, and offers in one place.',
       icon: Kanban,
       color: 'bg-blue-500',
-      shadow: 'shadow-blue-500/30'
+      shadow: 'shadow-blue-500/30',
+      roles: ['student', 'admin', 'employee']
     },
     {
       id: 'analyzer',
@@ -28,7 +40,8 @@ export function Home({ setActiveTab }: HomeProps) {
       description: 'Upload your resume and get AI-suggested job roles tailored to your experience.',
       icon: FileText,
       color: 'bg-emerald-500',
-      shadow: 'shadow-emerald-500/30'
+      shadow: 'shadow-emerald-500/30',
+      roles: ['student', 'mentor', 'admin', 'employee']
     },
     {
       id: 'builder',
@@ -36,7 +49,8 @@ export function Home({ setActiveTab }: HomeProps) {
       description: 'Create an ATS-friendly resume from scratch with AI assistance.',
       icon: Briefcase,
       color: 'bg-green-500',
-      shadow: 'shadow-green-500/30'
+      shadow: 'shadow-green-500/30',
+      roles: ['student', 'employee', 'admin']
     },
     {
       id: 'project',
@@ -44,7 +58,26 @@ export function Home({ setActiveTab }: HomeProps) {
       description: 'Get tech stack recommendations and learning paths for your project ideas.',
       icon: Code,
       color: 'bg-lime-500',
-      shadow: 'shadow-lime-500/30'
+      shadow: 'shadow-lime-500/30',
+      roles: ['student', 'employee', 'admin']
+    },
+    {
+      id: 'skillgap',
+      title: 'Skill Gap Analyzer',
+      description: 'Find missing skills for your dream role and get a custom learning roadmap.',
+      icon: Compass,
+      color: 'bg-rose-500',
+      shadow: 'shadow-rose-500/30',
+      roles: ['student', 'mentor', 'admin', 'employee']
+    },
+    {
+      id: 'stories',
+      title: 'STAR Story Vault',
+      description: 'Craft and analyze your behavioral interview stories using the STAR method.',
+      icon: Star,
+      color: 'bg-amber-500',
+      shadow: 'shadow-amber-500/30',
+      roles: ['student', 'mentor', 'admin', 'employee']
     },
     {
       id: 'tools',
@@ -52,9 +85,21 @@ export function Home({ setActiveTab }: HomeProps) {
       description: 'Master networking with AI outreach and practice salary negotiations.',
       icon: Sparkles,
       color: 'bg-emerald-600',
-      shadow: 'shadow-emerald-600/30'
+      shadow: 'shadow-emerald-600/30',
+      roles: ['student', 'employee', 'admin']
+    },
+    {
+      id: 'report',
+      title: 'Software Workflow',
+      description: 'View platform usage and user reports.',
+      icon: FileText,
+      color: 'bg-indigo-500',
+      shadow: 'shadow-indigo-500/30',
+      roles: ['admin', 'mentor']
     },
   ];
+
+  const features = allFeatures.filter(f => !role || f.roles.includes(role));
 
   return (
     <div className="max-w-6xl mx-auto space-y-12 pb-12">
@@ -74,12 +119,14 @@ export function Home({ setActiveTab }: HomeProps) {
           <p className="text-emerald-100/90 text-lg md:text-xl mb-10 max-w-lg leading-relaxed font-medium">
             Master interviews, optimize your resume, and build the right projects with your personal AI career coach.
           </p>
-          <button 
-            onClick={() => setActiveTab('interview')}
-            className="bg-emerald-400 text-emerald-950 px-8 py-4 rounded-2xl font-bold text-lg hover:bg-emerald-300 hover:scale-105 transition-all flex items-center gap-3 shadow-lg shadow-emerald-400/20"
-          >
-            Start Practicing <ArrowRight className="w-5 h-5" />
-          </button>
+          {(!role || ['student', 'employee', 'admin'].includes(role)) && (
+            <button 
+              onClick={() => setActiveTab('interview')}
+              className="bg-emerald-400 text-emerald-950 px-8 py-4 rounded-2xl font-bold text-lg hover:bg-emerald-300 hover:scale-105 transition-all flex items-center gap-3 shadow-lg shadow-emerald-400/20"
+            >
+              Start Practicing <ArrowRight className="w-5 h-5" />
+            </button>
+          )}
         </div>
         <div className="w-full md:w-2/5 h-72 md:h-auto relative min-h-[450px] hidden md:block">
           <img 
