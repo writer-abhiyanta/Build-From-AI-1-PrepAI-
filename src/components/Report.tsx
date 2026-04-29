@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Shield, Zap, Cpu, Globe, CheckCircle2, Server, Database, Layout, Lock, Download, Loader2 } from 'lucide-react';
 import mermaid from 'mermaid';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 
 mermaid.initialize({ 
   startOnLoad: false, 
@@ -41,78 +41,36 @@ export function Report() {
   const reportRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Add a style block to override oklch colors with HEX for html2canvas compatibility
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.innerHTML = `
-      .pdf-compat {
-        --color-emerald-50: #ecfdf5 !important;
-        --color-emerald-100: #d1fae5 !important;
-        --color-emerald-200: #a7f3d0 !important;
-        --color-emerald-300: #6ee7b7 !important;
-        --color-emerald-400: #34d399 !important;
-        --color-emerald-500: #10b981 !important;
-        --color-emerald-600: #059669 !important;
-        --color-emerald-700: #047857 !important;
-        --color-emerald-800: #065f46 !important;
-        --color-emerald-900: #064e3b !important;
-        --color-gray-50: #f9fafb !important;
-        --color-gray-100: #f3f4f6 !important;
-        --color-gray-200: #e5e7eb !important;
-        --color-gray-500: #6b7280 !important;
-        --color-gray-600: #4b5563 !important;
-        --color-gray-700: #374151 !important;
-        --color-gray-900: #111827 !important;
-        --color-teal-600: #0d9488 !important;
-        --color-teal-100: #ccfbf1 !important;
-        --color-green-600: #16a34a !important;
-        --color-green-100: #dcfce7 !important;
-      }
-    `;
-    document.head.appendChild(style);
-    return () => {
-      document.head.removeChild(style);
-    };
-  }, []);
-
   const downloadPDF = async () => {
     if (!reportRef.current) return;
     
     setIsGenerating(true);
-    // Add compatibility class before capture
-    reportRef.current.classList.add('pdf-compat');
     
     try {
-      const canvas = await html2canvas(reportRef.current, {
-        scale: 2,
-        useCORS: true,
+      // Force repaint or styles to settle
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const imgData = await toPng(reportRef.current, {
+        quality: 1,
+        pixelRatio: 2,
         backgroundColor: '#f9fafb',
-        logging: false,
-        onclone: (clonedDoc) => {
-          // Ensure the cloned element also has the compatibility class
-          const clonedElement = clonedDoc.querySelector('.pdf-compat') as HTMLElement;
-          if (clonedElement) {
-            clonedElement.style.backgroundColor = '#f9fafb';
-          }
-        }
+        // Optional: filter out elements if needed
       });
       
-      const imgData = canvas.toDataURL('image/png');
+      const width = reportRef.current.offsetWidth;
+      const height = reportRef.current.offsetHeight;
+
       const pdf = new jsPDF({
-        orientation: 'portrait',
+        orientation: height > width ? 'portrait' : 'landscape',
         unit: 'px',
-        format: [canvas.width / 2, canvas.height / 2]
+        format: [width, height]
       });
       
-      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+      pdf.addImage(imgData, 'PNG', 0, 0, width, height);
       pdf.save('PrepAI-Architecture-Report.pdf');
     } catch (error) {
       console.error("PDF generation failed", error);
     } finally {
-      // Remove compatibility class after capture
-      if (reportRef.current) {
-        reportRef.current.classList.remove('pdf-compat');
-      }
       setIsGenerating(false);
     }
   };

@@ -3,15 +3,6 @@ import { Send, User, Bot, Loader2, MessageSquare, Trash2, Lock } from 'lucide-re
 import { sendChatMessage } from '../lib/gemini';
 import Markdown from 'react-markdown';
 
-declare global {
-  interface Window {
-    aistudio?: {
-      hasSelectedApiKey: () => Promise<boolean>;
-      openSelectKey: () => Promise<void>;
-    };
-  }
-}
-
 interface Message {
   role: 'user' | 'model';
   content: string;
@@ -22,29 +13,9 @@ export function GeminiChat() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [model, setModel] = useState('gemini-3-flash-preview');
-  const [hasKey, setHasKey] = useState<boolean | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   const systemInstruction = "You are a Senior Director and Strategic Career Mentor. You help students and professionals with high-level career strategy, leadership development, and positioning themselves for impact. Be professional, direct, and insightful.";
-
-  useEffect(() => {
-    const checkKey = async () => {
-      if (window.aistudio?.hasSelectedApiKey) {
-        const selected = await window.aistudio.hasSelectedApiKey();
-        setHasKey(selected);
-      } else {
-        setHasKey(true);
-      }
-    };
-    checkKey();
-  }, []);
-
-  const handleSelectKey = async () => {
-    if (window.aistudio?.openSelectKey) {
-      await window.aistudio.openSelectKey();
-      setHasKey(true);
-    }
-  };
 
   useEffect(() => {
     if (chatContainerRef.current) {

@@ -123,9 +123,7 @@ export async function sendChatMessage(messages: any[], systemInstruction?: strin
 }
 
 export async function generateImage(prompt: string, size: "1K" | "2K" | "4K" = "1K") {
-  const imageAi = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY! });
-  
-  const response = await imageAi.models.generateContent({
+  const response = await ai.models.generateContent({
     model: "gemini-3.1-flash-image-preview",
     contents: {
       parts: [{ text: prompt }]
