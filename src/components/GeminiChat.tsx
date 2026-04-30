@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, User, Bot, Loader2, MessageSquare, Trash2, Lock } from 'lucide-react';
+import { Send, User, Bot, Loader2, MessageSquare, Trash2 } from 'lucide-react';
 import { sendChatMessage } from '../lib/gemini';
 import Markdown from 'react-markdown';
 

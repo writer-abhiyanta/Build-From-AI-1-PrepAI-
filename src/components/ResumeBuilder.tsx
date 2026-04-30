@@ -19,16 +19,24 @@ export function ResumeBuilder() {
     experience: '',
     education: '',
     skills: '',
-    projects: ''
+    projects: '',
+    template: 'Standard Professional'
   });
   const [result, setResult] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+
+  const templates = [
+    { id: 'Standard Professional', name: 'Standard Professional', description: 'Traditional structure, best for corporate roles.' },
+    { id: 'Modern Creative', name: 'Modern Creative', description: 'Focus on impact and design, great for startups/design.' },
+    { id: 'Technical IT', name: 'Technical / IT', description: 'Emphasizes tech stack and complex projects.' },
+    { id: 'Academic CV', name: 'Academic & Research', description: 'Focus on education, research, and publications.' }
+  ];
   
   const resumeRef = useRef<HTMLDivElement>(null);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
@@ -37,6 +45,7 @@ export function ResumeBuilder() {
     
     const prompt = `
       Create a professional, ATS-friendly resume using the following details. 
+      The user wants the resume formatted in a "${formData.template}" style. Adapt the tone, section ordering, and emphasis for this template.
       Format it clearly using Markdown. Use strong action verbs and quantify achievements where possible (even if you have to suggest placeholders like [X]%).
       
       Name: ${formData.name}
@@ -127,6 +136,22 @@ export function ResumeBuilder() {
         <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4 h-[calc(100vh-12rem)] overflow-y-auto">
           <h3 className="text-xl font-semibold text-gray-900 mb-4 sticky top-0 bg-white py-2 border-b">Your Details</h3>
           
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Resume Template</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {templates.map((tpl) => (
+                <div 
+                  key={tpl.id}
+                  onClick={() => setFormData({ ...formData, template: tpl.id })}
+                  className={`p-3 rounded-xl border cursor-pointer transition-all ${formData.template === tpl.id ? 'border-emerald-500 bg-emerald-50 shadow-sm' : 'border-gray-200 hover:border-emerald-300 hover:bg-gray-50'}`}
+                >
+                  <div className="font-semibold text-sm text-gray-900">{tpl.name}</div>
+                  <div className="text-xs text-gray-500 mt-1 leading-snug">{tpl.description}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>

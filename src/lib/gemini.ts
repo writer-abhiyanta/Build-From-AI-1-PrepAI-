@@ -4,7 +4,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export async function generateText(prompt: string, systemInstruction?: string, model: string = "gemini-3-flash-preview") {
   const response = await ai.models.generateContent({
-    model: model,
+    model: model as any,
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     config: systemInstruction ? { systemInstruction } : undefined,
   });
@@ -13,7 +13,7 @@ export async function generateText(prompt: string, systemInstruction?: string, m
 
 export async function generateStructuredFeedback(prompt: string) {
   const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
+    model: "gemini-3-flash-preview" as any,
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     config: {
       systemInstruction: "You are an expert interview coach acting as a Senior Hiring Manager. Analyze the user's response to an interview question. Provide feedback in a strict JSON format focusing on Content, Tone, Clarity, and specific common mistakes like filler words, STAR method usage, and example clarity.",
@@ -88,7 +88,7 @@ export async function generateStructuredFeedback(prompt: string) {
 
 export async function analyzeResume(fileBase64: string, mimeType: string) {
   const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
+    model: "gemini-3-flash-preview" as any,
     contents: [
       {
         role: 'user',
@@ -114,7 +114,7 @@ export async function sendChatMessage(messages: any[], systemInstruction?: strin
   }));
 
   const response = await ai.models.generateContent({
-     model: model,
+     model: model as any,
      contents: contents,
      config: systemInstruction ? { systemInstruction } : undefined,
   });
@@ -129,6 +129,7 @@ export async function generateImage(prompt: string, size: "1K" | "2K" | "4K" = "
       parts: [{ text: prompt }]
     },
     config: {
+      // @ts-ignore
       imageConfig: {
         aspectRatio: "1:1",
         imageSize: size

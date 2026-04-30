@@ -21,8 +21,8 @@ export function Home({ setActiveTab, role }: HomeProps) {
       title: 'Interview Practice',
       description: 'Practice your interview skills with our AI interviewer. Get real-time feedback and tips.',
       icon: MessageSquare,
-      color: 'bg-teal-500',
-      shadow: 'shadow-teal-500/30',
+      color: 'bg-pink-500',
+      shadow: 'shadow-pink-500/30',
       roles: ['student', 'employee', 'admin']
     },
     {
@@ -30,8 +30,8 @@ export function Home({ setActiveTab, role }: HomeProps) {
       title: 'Placement Tracker',
       description: 'Manage and track your job applications, interviews, and offers in one place.',
       icon: Kanban,
-      color: 'bg-blue-500',
-      shadow: 'shadow-blue-500/30',
+      color: 'bg-green-500',
+      shadow: 'shadow-green-500/30',
       roles: ['student', 'admin', 'employee']
     },
     {
@@ -93,8 +93,8 @@ export function Home({ setActiveTab, role }: HomeProps) {
       title: 'Software Workflow',
       description: 'View platform usage and user reports.',
       icon: FileText,
-      color: 'bg-indigo-500',
-      shadow: 'shadow-indigo-500/30',
+      color: 'bg-green-500',
+      shadow: 'shadow-green-500/30',
       roles: ['admin', 'mentor']
     },
   ];

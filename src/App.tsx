@@ -39,6 +39,7 @@ export default function App() {
       }
 
       if (user) {
+        setLoading(false); // Make app load faster immediately
         const userDocRef = doc(db, 'users', user.uid);
         unsubDoc = onSnapshot(userDocRef, (doc) => {
           if (doc.exists()) {
@@ -48,12 +49,10 @@ export default function App() {
             setRole('student');
             setSubscriptionStatus('inactive');
           }
-          setLoading(false);
         }, (error) => {
           console.error("Error fetching user role:", error);
           setRole('student'); // Fallback on error
           setSubscriptionStatus('inactive');
-          setLoading(false);
         });
       } else {
         setRole(null);
@@ -182,7 +181,7 @@ export default function App() {
               <button 
                 onClick={() => handleSignIn('mentor')}
                 disabled={isSigningIn}
-                className="w-full relative overflow-hidden flex items-center justify-center gap-4 bg-gradient-to-r from-emerald-600 to-teal-600 border-2 border-transparent py-4 rounded-2xl font-bold text-white hover:shadow-lg hover:shadow-emerald-500/30 hover:-translate-y-0.5 transition-all duration-300 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed group"
+                className="w-full relative overflow-hidden flex items-center justify-center gap-4 bg-gradient-to-r from-emerald-600 to-teal-600 border-2 border-transparent py-4 rounded-2xl font-bold text-white hover:shadow-lg hover:shadow-emerald-500/30 transition-all duration-300 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed group"
               >
                 <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/30 to-transparent group-hover:animate-[shimmer_1.5s_infinite]" />
                 <style>{`
@@ -215,7 +214,7 @@ export default function App() {
             </div>
 
             {authError && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm font-medium flex flex-col gap-2">
+              <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm font-medium flex flex-col gap-2 mt-4">
                 <p>{authError}</p>
                 <button 
                   onClick={() => window.location.reload()}
@@ -226,7 +225,7 @@ export default function App() {
               </div>
             )}
             
-            <p className="text-xs text-gray-400 px-8">
+            <p className="text-xs text-gray-400 px-8 mt-6">
               By continuing, you agree to our Terms of Service and Privacy Policy.
             </p>
           </div>
@@ -278,18 +277,20 @@ export default function App() {
     <ErrorBoundary>
       <div className="flex h-screen bg-gray-50 text-gray-900 font-sans">
         <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} user={user} role={role} />
-        <main className="flex-1 overflow-y-auto p-8">
-          {activeTab === 'home' && <Home setActiveTab={setActiveTab} role={role} />}
-          {activeTab === 'chat' && <GeminiChat />}
-          {activeTab === 'skillgap' && <SkillGapAnalyzer />}
-          {activeTab === 'stories' && <StoryVault />}
-          {activeTab === 'interview' && <InterviewPractice />}
-          {activeTab === 'tracker' && <JobTracker />}
-          {activeTab === 'analyzer' && <ResumeAnalyzer />}
-          {activeTab === 'builder' && <ResumeBuilder />}
-          {activeTab === 'project' && <ProjectBuilder />}
-          {activeTab === 'tools' && <CareerTools />}
-          {activeTab === 'report' && <Report />}
+        <main className="flex-1 overflow-y-auto flex flex-col relative">
+          <div className="p-8 flex-1">
+            {activeTab === 'home' && <Home setActiveTab={setActiveTab} role={role} />}
+            {activeTab === 'chat' && <GeminiChat />}
+            {activeTab === 'skillgap' && <SkillGapAnalyzer />}
+            {activeTab === 'stories' && <StoryVault />}
+            {activeTab === 'interview' && <InterviewPractice />}
+            {activeTab === 'tracker' && <JobTracker />}
+            {activeTab === 'analyzer' && <ResumeAnalyzer />}
+            {activeTab === 'builder' && <ResumeBuilder />}
+            {activeTab === 'project' && <ProjectBuilder />}
+            {activeTab === 'tools' && <CareerTools />}
+            {activeTab === 'report' && <Report />}
+          </div>
         </main>
       </div>
     </ErrorBoundary>
