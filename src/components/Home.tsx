@@ -1,4 +1,4 @@
-import { ArrowRight, MessageSquare, FileText, Briefcase, Code, Sparkles, Kanban, MessageCircle, Star, Compass } from 'lucide-react';
+import { ArrowRight, MessageSquare, FileText, Briefcase, Code, Sparkles, Kanban, MessageCircle, Star, Compass, Lightbulb } from 'lucide-react';
 
 interface HomeProps {
   setActiveTab: (tab: string) => void;
@@ -20,9 +20,9 @@ export function Home({ setActiveTab, role }: HomeProps) {
       id: 'interview',
       title: 'Interview Practice',
       description: 'Practice your interview skills with our AI interviewer. Get real-time feedback and tips.',
-      icon: MessageSquare,
-      color: 'bg-pink-500',
-      shadow: 'shadow-pink-500/30',
+      icon: Lightbulb,
+      color: 'bg-emerald-500',
+      shadow: 'shadow-emerald-500/30',
       roles: ['student', 'employee', 'admin']
     },
     {

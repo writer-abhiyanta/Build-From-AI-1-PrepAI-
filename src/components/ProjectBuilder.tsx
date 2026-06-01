@@ -27,6 +27,7 @@ function MermaidChart({ chart }: { chart: string }) {
 
 export function ProjectBuilder() {
   const [idea, setIdea] = useState('');
+  const [difficulty, setDifficulty] = useState('Beginner');
   const [result, setResult] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -37,9 +38,10 @@ export function ProjectBuilder() {
     
     const prompt = `
       I want to build the following software project: "${idea}"
+      My current skill level allows me to build this at a "${difficulty}" level.
       
-      Please provide a comprehensive guide including:
-      1. Recommended Tech Stack (Frontend, Backend, Database, Deployment) with reasons.
+      Please provide a comprehensive guide tailored to a ${difficulty} developer, including:
+      1. Recommended Tech Stack (Frontend, Backend, Database, Deployment) with reasons, appropriately scoped for the ${difficulty} level.
       2. Languages and Frameworks I need to learn.
       3. A step-by-step learning path and development roadmap to build this project.
       4. Potential challenges and how to overcome them.
@@ -72,20 +74,30 @@ export function ProjectBuilder() {
         </p>
       </header>
 
-      <div className="bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center mb-8 focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-transparent transition-all">
+      <div className="bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex flex-col sm:flex-row gap-3 items-center mb-8 focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-transparent transition-all">
+        <select
+          value={difficulty}
+          onChange={(e) => setDifficulty(e.target.value)}
+          className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-medium text-gray-700 w-full sm:w-auto"
+          disabled={isLoading}
+        >
+          <option value="Beginner">Beginner</option>
+          <option value="Intermediate">Intermediate</option>
+          <option value="Advanced">Advanced</option>
+        </select>
         <input
           type="text"
           value={idea}
           onChange={(e) => setIdea(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
           placeholder="e.g., An e-commerce website for selling custom sneakers..."
-          className="flex-1 px-4 py-3 outline-none text-gray-900 bg-transparent"
+          className="flex-1 px-4 py-3 outline-none text-gray-900 bg-transparent w-full"
           disabled={isLoading}
         />
         <button
           onClick={handleGenerate}
           disabled={!idea.trim() || isLoading}
-          className="bg-emerald-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-emerald-600/20"
+          className="bg-emerald-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 w-full sm:w-auto shrink-0"
         >
           {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
           Generate Plan

@@ -1,14 +1,55 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, collection, addDoc, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged, User, setPersistence, browserSessionPersistence } from 'firebase/auth';
+import { initializeFirestore, memoryLocalCache, doc, setDoc, getDoc, collection, addDoc, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+setPersistence(auth, browserSessionPersistence).catch(console.error);
+export const db = initializeFirestore(app, {
+  localCache: memoryLocalCache()
+}, firebaseConfig.firestoreDatabaseId);
+
+export const checkRedirectResult = async () => {
+  try {
+    const result = await getRedirectResult(auth);
+    if (result && result.user) {
+      const user = result.user;
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        const preferredRole = sessionStorage.getItem('preferredRole') || 'student';
+        let role = preferredRole;
+        
+        if (user.email === "engineeringstudies5@gmail.com") {
+          role = 'admin';
+        } else if (userDoc.exists()) {
+          role = userDoc.data().role || preferredRole;
+        }
+
+        await setDoc(doc(db, 'users', user.uid), {
+          uid: user.uid,
+          email: user.email || '',
+          displayName: user.displayName || '',
+          photoURL: user.photoURL || '',
+          role: role,
+          lastLogin: new Date().toISOString()
+        }, { merge: true });
+        
+        sessionStorage.removeItem('preferredRole');
+      } catch (fsError) {
+        console.error("Error saving user profile to Firestore via redirect:", fsError);
+      }
+    }
+  } catch (error) {
+    console.error("Redirect check error:", error);
+    throw error;
+  }
+};
+
 export const signInWithGoogle = async (preferredRole: 'student' | 'employee' | 'mentor' | 'admin' = 'student') => {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
+  sessionStorage.setItem('preferredRole', preferredRole);
   
   try {
     const result = await signInWithPopup(auth, provider);
@@ -41,7 +82,13 @@ export const signInWithGoogle = async (preferredRole: 'student' | 'employee' | '
   } catch (error: any) {
     console.error("Error signing in with Google", error);
     
-    // Specific handling for common Firebase Auth errors
+    // Fallback to Redirect if Popup is blocked
+    if (error.code === 'auth/popup-blocked') {
+      console.warn("Popup blocked by browser. Falling back to signInWithRedirect...");
+      await signInWithRedirect(auth, provider);
+      return null;
+    }
+    
     if (error.code === 'auth/popup-closed-by-user') {
       throw new Error("Sign-in cancelled. Use the Google login window to complete the process.");
     }
@@ -55,6 +102,7 @@ export const signInWithGoogle = async (preferredRole: 'student' | 'employee' | '
     if (error.code === 'auth/unauthorized-domain') {
       throw new Error("Domain not authorized. Check Firebase Auth settings.");
     }
+
     if (error.message && (error.message.includes('INTERNAL ASSERTION FAILED') || error.message.includes('Pending promise'))) {
       // This is a known Firebase SDK issue in specific environments (like iframes)
       throw new Error("Auth connection issue. Please refresh the page and try logging in again.");

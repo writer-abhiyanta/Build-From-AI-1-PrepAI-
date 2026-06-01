@@ -1,6 +1,8 @@
-import { Briefcase, FileText, LayoutDashboard, MessageSquare, Code, LogOut, User as UserIcon, MessageCircle, Sparkles, Kanban, Star, Compass } from 'lucide-react';
+import { Briefcase, FileText, LayoutDashboard, MessageSquare, Code, LogOut, User as UserIcon, MessageCircle, Sparkles, Kanban, Star, Compass, Lightbulb, Key } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { logout } from '../lib/firebase';
+import { useState } from 'react';
+import { ApiSettingsModal } from './ApiSettingsModal';
 
 interface SidebarProps {
   activeTab: string;
@@ -10,12 +12,13 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activeTab, setActiveTab, user, role }: SidebarProps) {
+  const [isApiModalOpen, setIsApiModalOpen] = useState(false);
   const navItems = [
     { id: 'home', label: 'Dashboard', icon: LayoutDashboard, roles: ['student', 'mentor', 'admin', 'employee'] },
     { id: 'chat', label: 'AI Mentor', icon: MessageCircle, roles: ['student', 'mentor', 'admin'] },
     { id: 'skillgap', label: 'Skill Gap Analyzer', icon: Compass, roles: ['student', 'mentor', 'admin', 'employee'] },
     { id: 'stories', label: 'STAR Story Vault', icon: Star, roles: ['student', 'mentor', 'admin', 'employee'] },
-    { id: 'interview', label: 'Interview Practice', icon: MessageSquare, roles: ['student', 'employee', 'admin'] },
+    { id: 'interview', label: 'Interview Practice', icon: Lightbulb, roles: ['student', 'employee', 'admin'] },
     { id: 'tracker', label: 'Placement Tracker', icon: Kanban, roles: ['student', 'admin', 'employee'] },
     { id: 'analyzer', label: 'Resume Analyzer', icon: FileText, roles: ['student', 'mentor', 'admin', 'employee'] },
     { id: 'builder', label: 'Resume Builder', icon: Briefcase, roles: ['student', 'employee', 'admin'] },
@@ -82,7 +85,13 @@ export function Sidebar({ activeTab, setActiveTab, user, role }: SidebarProps) {
           </div>
         )}
         
-
+        <button 
+          onClick={() => setIsApiModalOpen(true)}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-emerald-600 hover:bg-emerald-50 transition-colors font-medium border border-emerald-100"
+        >
+          <Key className="w-5 h-5 text-emerald-500" />
+          API Configuration
+        </button>
 
         <button 
           onClick={() => logout()}
@@ -92,6 +101,8 @@ export function Sidebar({ activeTab, setActiveTab, user, role }: SidebarProps) {
           Sign Out
         </button>
       </div>
+      
+      <ApiSettingsModal isOpen={isApiModalOpen} onClose={() => setIsApiModalOpen(false)} />
     </aside>
   );
 }

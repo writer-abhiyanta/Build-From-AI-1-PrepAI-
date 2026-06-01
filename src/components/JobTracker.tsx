@@ -11,13 +11,14 @@ interface JobApplication {
   status: 'applied' | 'interviewing' | 'offered' | 'rejected';
   date: string;
   dueDate?: string;
+  priority?: 'Low' | 'Medium' | 'High';
   userId: string;
 }
 
 export function JobTracker() {
   const [applications, setApplications] = useState<JobApplication[]>([]);
   const [isAdding, setIsAdding] = useState(false);
-  const [newApp, setNewApp] = useState({ company: '', role: '', location: '', status: 'applied' as const, dueDate: '' });
+  const [newApp, setNewApp] = useState<{ company: string; role: string; location: string; priority: 'Low' | 'Medium' | 'High'; status: 'applied' | 'interviewing' | 'offered' | 'rejected'; dueDate: string; }>({ company: '', role: '', location: '', priority: 'Medium', status: 'applied', dueDate: '' });
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -42,6 +43,7 @@ export function JobTracker() {
         company: newApp.company,
         role: newApp.role,
         location: newApp.location,
+        priority: newApp.priority,
         status: newApp.status,
         userId: auth.currentUser.uid,
         date: new Date().toISOString().split('T')[0]
@@ -52,7 +54,7 @@ export function JobTracker() {
       
       await addDoc(collection(db, 'applications'), appData);
       setIsAdding(false);
-      setNewApp({ company: '', role: '', location: '', status: 'applied', dueDate: '' });
+      setNewApp({ company: '', role: '', location: '', priority: 'Medium', status: 'applied', dueDate: '' });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'applications');
     }
@@ -75,7 +77,7 @@ export function JobTracker() {
   };
 
   const columns: { id: JobApplication['status']; label: string; icon: any; color: string }[] = [
-    { id: 'applied', label: 'Applied', icon: Clock, color: 'text-blue-600 bg-blue-50' },
+    { id: 'applied', label: 'Applied', icon: Clock, color: 'text-green-600 bg-green-50' },
     { id: 'interviewing', label: 'Interviewing', icon: AlertCircle, color: 'text-amber-600 bg-amber-50' },
     { id: 'offered', label: 'Offered', icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50' },
     { id: 'rejected', label: 'Rejected', icon: Trash2, color: 'text-red-600 bg-red-50' },
@@ -140,6 +142,18 @@ export function JobTracker() {
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Priority</label>
+                <select 
+                  value={newApp.priority}
+                  onChange={e => setNewApp({...newApp, priority: e.target.value as 'Low' | 'Medium' | 'High'})}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                </select>
+              </div>
               <div className="flex gap-4 pt-4">
                 <button 
                   type="button"
@@ -165,7 +179,7 @@ export function JobTracker() {
           <div key={col.id} className="space-y-4">
             <div className={`flex items-center justify-between p-4 rounded-2xl ${col.color} border border-current/10`}>
               <div className="flex items-center gap-2">
-                <col.icon className="w-5 h-5" />
+                <col.icon className={`w-5 h-5 ${col.id === 'offered' ? 'animate-bounce' : ''}`} />
                 <span className="font-bold uppercase tracking-wider text-xs">{col.label}</span>
               </div>
               <span className="bg-white/50 px-2 py-0.5 rounded-lg text-xs font-black">
@@ -175,12 +189,25 @@ export function JobTracker() {
 
             <div className="space-y-4">
               {applications.filter(a => a.status === col.id).map(app => (
-                <div key={app.id} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group relative">
+                <div key={app.id} className={`bg-white p-5 rounded-3xl border border-gray-100 shadow-sm transition-all group relative ${app.status === 'offered' ? 'animate-pulse hover:animate-none border-emerald-200' : 'hover:shadow-md'}`}>
                   <div className="flex justify-between items-start mb-4">
                     <div>
-                      <h4 className="font-bold text-gray-900 group-hover:text-emerald-600 transition-colors">{app.role}</h4>
-                      <div className="flex items-center gap-1 text-gray-500 text-xs mt-1">
-                        <Building2 className="w-3 h-3" /> {app.company}
+                      <h4 className="font-bold text-gray-900 group-hover:text-emerald-600 transition-colors">
+                        {app.role}
+                      </h4>
+                      <div className="flex items-center gap-2 mt-1">
+                        {app.priority && (
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                            app.priority === 'High' ? 'bg-red-100 text-red-600' :
+                            app.priority === 'Medium' ? 'bg-amber-100 text-amber-600' :
+                            'bg-blue-100 text-blue-600'
+                          }`}>
+                            {app.priority}
+                          </span>
+                        )}
+                        <div className="flex items-center gap-1 text-gray-500 text-xs">
+                          <Building2 className="w-3 h-3" /> {app.company}
+                        </div>
                       </div>
                     </div>
                     <button 

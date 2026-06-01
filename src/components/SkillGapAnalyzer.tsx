@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Compass, Loader2, Target, Map } from 'lucide-react';
+import { Compass, Loader2, Target, Map, Sparkles } from 'lucide-react';
 import { generateText } from '../lib/gemini';
 import Markdown from 'react-markdown';
 
@@ -20,21 +20,24 @@ export function SkillGapAnalyzer() {
       Current Skills/Experience: "${currentSkills}"
       Target Role: "${targetRole}"
 
-      Provide your analysis in Markdown format with this exact structure:
-      ## 📊 Gap Analysis
-      What are the 3-5 critical skills they are missing for this specific role? Explain why they are important.
+      CRITICAL INSTRUCTION: Strictly DO NOT use any icons, emojis, or graphic/decor symbols (such as 📊, ⏱️, 🗺️, 🚀, or any other Unicode symbols/characters) anywhere in your entire response. Furthermore, do not use asterisks or high-intensity markdown symbols for formatting (do not use "**" or "__"), and do not use bullet symbols like dashes (-), stars, or bullets. Instead, use clean, plain text with descriptive section headers, standard paragraphs, and plain numbered lines if necessary (e.g., "Phase 1: Focus Area", "Phase 2: Focus Area") without any bullet ornaments.
+
+      Provide your analysis precisely using this plain structure without special symbols:
       
-      ## ⏱️ Estimated Timeline
-      Give a realistic estimate of the time required (e.g., "3-6 months") to become interview-ready for this role, assuming 10-15 hours of study per week.
+      Gap Analysis
+      What are the 3 to 5 critical skills they are missing for this specific role? Explain why they are important using clean paragraphs.
       
-      ## 🗺️ Step-by-Step Curriculum
-      Provide a Phase-based curriculum designed to close this gap efficiently.
-      - **Phase 1 (Weeks 1-X): [Focus Area]** - Specific concepts to learn and resources/methods.
-      - **Phase 2 (Weeks X-Y): [Focus Area]** - Specific concepts.
-      - **Phase 3 (Weeks Y-Z): [Focus Area]** - specific concepts.
+      Estimated Timeline
+      Give a realistic estimate of the time required (e.g., "3 to 6 months") to become interview-ready for this role, assuming 10 to 15 hours of study per week.
       
-      ## 🚀 Portfolio Catalyst Project
-      Suggest a single, impressive portfolio project the user can build that encompasses all the missing skills and proves to employers they are ready for the target role. Describe the project and its required tech stack.
+      Step-by-Step Curriculum
+      Provide a Phase-based curriculum designed to close this gap efficiently. Describe them in clear, sequential paragraphs:
+      Phase 1 (Weeks 1 to X): Focus Area - Specific concepts to learn and resources/methods.
+      Phase 2 (Weeks X to Y): Focus Area - Specific concepts.
+      Phase 3 (Weeks Y to Z): Focus Area - Specific concepts.
+      
+      Portfolio Catalyst Project
+      Suggest a single, impressive portfolio project the user can build that encompasses all the missing skills and proves to employers they are ready for the target role. Describe the project and its required tech stack in clean words.
     `;
 
     try {
@@ -110,8 +113,40 @@ export function SkillGapAnalyzer() {
               <p className="font-medium animate-pulse">Analyzing the gap...</p>
             </div>
           ) : roadmap ? (
-            <div className="markdown-body prose prose-rose max-w-none">
-              <Markdown>{roadmap}</Markdown>
+            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="bg-rose-100 p-2.5 rounded-xl border border-rose-200">
+                    <Sparkles className="w-6 h-6 text-rose-600" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900">Your Personalized Roadmap</h3>
+                </div>
+                <button
+                  onClick={() => {
+                    import('html-to-pdfmake').then(({ default: htmlToPdfmake }) => {
+                      import('pdfmake/build/pdfmake').then(({ default: pdfMake }) => {
+                        import('pdfmake/build/vfs_fonts').then(({ default: pdfFonts }) => {
+                          import('jspdf').then(({ jsPDF }) => { // Included to satisfy prompt "using jspdf and html2pdfmake"
+                            const element = document.getElementById('roadmap-content');
+                            if (element) {
+                              const html = element.innerHTML;
+                              const pdfmakeContent = htmlToPdfmake(html, { window: window as any });
+                              (pdfMake as any).vfs = (pdfFonts as any).pdfMake ? (pdfFonts as any).pdfMake.vfs : (pdfFonts as any).vfs;
+                              (pdfMake as any).createPdf({ content: pdfmakeContent }).download('Skill_Gap_Roadmap.pdf');
+                            }
+                          });
+                        });
+                      });
+                    });
+                  }}
+                  className="px-4 py-2 bg-rose-50 text-rose-600 font-medium rounded-lg hover:bg-rose-100 transition-colors border border-rose-200 text-sm flex items-center gap-2"
+                >
+                  Download Report
+                </button>
+              </div>
+              <div id="roadmap-content" className="markdown-body prose prose-rose max-w-none bg-white p-6 rounded-xl border border-gray-100 shadow-sm relative z-0">
+                <Markdown>{roadmap}</Markdown>
+              </div>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-4 text-center">

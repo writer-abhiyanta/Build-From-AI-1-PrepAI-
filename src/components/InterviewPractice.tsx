@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, User, Bot, Loader2, Sparkles, CheckCircle, AlertCircle, BarChart, Quote, Zap, AlertTriangle, Star, MessageSquare, History, Plus, ArrowLeft } from 'lucide-react';
+  import { Send, User, Bot, Loader2, Sparkles, CheckCircle, AlertCircle, BarChart, Quote, Zap, AlertTriangle, Star, MessageSquare, History, Plus, ArrowLeft, Mic, Square, Video, VideoOff, Lightbulb } from 'lucide-react';
 import { sendChatMessage, generateStructuredFeedback } from '../lib/gemini';
 import Markdown from 'react-markdown';
 
@@ -40,6 +40,8 @@ interface Message {
   feedback?: string | FeedbackData;
   isAnalyzing?: boolean;
   showFeedback?: boolean;
+  mediaUrl?: string; // For later review
+  isVideo?: boolean;
 }
 
 interface PracticeSession {
@@ -70,6 +72,106 @@ export function InterviewPractice() {
   const [history, setHistory] = useState<PracticeSession[]>([]);
   const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
   const [showHistoryList, setShowHistoryList] = useState(false);
+
+  // STAR Prompt State
+  const [isStarPromptActive, setIsStarPromptActive] = useState(false);
+  const [initialResponseText, setInitialResponseText] = useState('');
+  const [starData, setStarData] = useState({ situation: '', task: '', action: '', result: '' });
+
+  // Recording State
+  const [isRecording, setIsRecording] = useState(false);
+  const [isVideoEnabled, setIsVideoEnabled] = useState(false);
+  const [recordingTimeLeft, setRecordingTimeLeft] = useState(120);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const speechRecognitionRef = useRef<any>(null);
+  const currentMediaUrl = useRef<string | null>(null);
+  const videoPreviewRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      speechRecognitionRef.current = new SpeechRecognition();
+      speechRecognitionRef.current.continuous = true;
+      speechRecognitionRef.current.interimResults = true;
+      
+      speechRecognitionRef.current.onresult = (event: any) => {
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          }
+        }
+        if (finalTranscript) {
+           setInput(prev => prev + (prev.endsWith(' ') || prev.length === 0 ? '' : ' ') + finalTranscript.trim());
+        }
+      };
+    }
+  }, []);
+
+  useEffect(() => {
+    let timer: number;
+    if (isRecording && recordingTimeLeft > 0) {
+      timer = window.setInterval(() => {
+        setRecordingTimeLeft(prev => prev - 1);
+      }, 1000);
+    } else if (isRecording && recordingTimeLeft === 0) {
+      stopRecording();
+    }
+    return () => clearInterval(timer);
+  }, [isRecording, recordingTimeLeft]);
+
+  const toggleRecording = async () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideoEnabled });
+      
+      if (isVideoEnabled && videoPreviewRef.current) {
+        videoPreviewRef.current.srcObject = stream;
+      }
+      
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorderRef.current.onstop = () => {
+        const mediaBlob = new Blob(audioChunksRef.current, { type: isVideoEnabled ? 'video/webm' : 'audio/webm' });
+        currentMediaUrl.current = URL.createObjectURL(mediaBlob);
+        stream.getTracks().forEach(track => track.stop());
+        if (videoPreviewRef.current) {
+          videoPreviewRef.current.srcObject = null;
+        }
+      };
+
+      mediaRecorderRef.current.start();
+      speechRecognitionRef.current?.start();
+      setRecordingTimeLeft(120);
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Error accessing media devices:", err);
+      alert("Microphone/Camera access is required for recording.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      speechRecognitionRef.current?.stop();
+      setIsRecording(false);
+    }
+  };
 
   useEffect(() => {
     const savedHistory = localStorage.getItem('prep_ai_interview_history');
@@ -109,6 +211,10 @@ export function InterviewPractice() {
     ]);
     setViewingSessionId(null);
     setShowHistoryList(false);
+    setIsStarPromptActive(false);
+    setStarData({ situation: '', task: '', action: '', result: '' });
+    setInitialResponseText('');
+    setInput('');
   };
   
   const personas = {
@@ -127,15 +233,42 @@ export function InterviewPractice() {
   }, [messages, viewingSessionId, showHistoryList]);
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+    if ((!input.trim() && !isStarPromptActive) || isLoading) return;
+
+    if (!isStarPromptActive && messages.length >= 3) {
+      setInitialResponseText(input.trim());
+      setIsStarPromptActive(true);
+      return;
+    }
 
     const personaInstruction = personas[persona as keyof typeof personas] || personas['Standard'];
     const systemInstruction = `${personaInstruction} You are conducting an interview with a total of ${totalQuestions} questions. You have asked ${questionsAsked} questions so far (not counting the initial role inquiry). Ask one question at a time. Wait for the user's response. After they respond, provide constructive feedback on their answer, and then ask the next question. If you have reached ${totalQuestions} questions, conclude the interview and offer a final summary.`;
 
-    const userMessage = input.trim();
-    setInput('');
+    let userMessage = input.trim();
+    if (isStarPromptActive) {
+      const isStarFilled = Object.values(starData).some(val => val.trim().length > 0);
+      if (isStarFilled) {
+        userMessage = `Initial thought: ${initialResponseText}\n\nStructured using STAR method:\nSituation: ${starData.situation}\nTask: ${starData.task}\nAction: ${starData.action}\nResult: ${starData.result}`;
+      } else {
+        userMessage = initialResponseText;
+      }
+      setIsStarPromptActive(false);
+      setStarData({ situation: '', task: '', action: '', result: '' });
+      setInitialResponseText('');
+      setInput('');
+    } else {
+      setInput('');
+    }
+
     const userMsgId = Date.now().toString();
-    const newUserMsg: Message = { id: userMsgId, role: 'user', text: userMessage };
+    const newUserMsg: Message = { 
+      id: userMsgId, 
+      role: 'user', 
+      text: userMessage,
+      mediaUrl: currentMediaUrl.current || undefined,
+      isVideo: isVideoEnabled && currentMediaUrl.current ? true : undefined
+    };
+    currentMediaUrl.current = null;
     const newMessagesList = [...messages, newUserMsg];
     setMessages(newMessagesList);
     setIsLoading(true);
@@ -221,13 +354,18 @@ export function InterviewPractice() {
     <div className="max-w-4xl mx-auto h-[calc(100vh-4rem)] flex flex-col bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden relative">
       <div className="p-6 border-b border-gray-200 bg-gray-50 flex flex-col gap-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">
-              {showHistoryList ? 'Interview History' : (viewingSessionId ? 'Past Interview Session' : 'Interview Practice')}
-            </h2>
-            <p className="text-gray-600 mt-1">
-              {showHistoryList ? 'Review your previous practice sessions and feedback.' : 'Chat with our AI to improve your interview skills.'}
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="bg-emerald-100 p-2.5 rounded-xl border border-emerald-200">
+              <Lightbulb className="w-6 h-6 text-emerald-600" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">
+                {showHistoryList ? 'Interview History' : (viewingSessionId ? 'Past Interview Session' : 'Interview Practice')}
+              </h2>
+              <p className="text-gray-600 mt-1 hover:text-emerald-600 transition-colors">
+                {showHistoryList ? 'Review your previous practice sessions and feedback.' : 'Chat with our AI to improve your interview skills.'}
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {!showHistoryList && !viewingSessionId && (
@@ -366,9 +504,9 @@ export function InterviewPractice() {
             <div key={msg.id} className="space-y-2">
               <div className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-                  msg.role === 'user' ? 'bg-emerald-100 text-emerald-600' : 'bg-teal-100 text-teal-600'
+                  msg.role === 'user' ? 'bg-emerald-100 text-emerald-600' : 'bg-emerald-100 text-emerald-600'
                 }`}>
-                  {msg.role === 'user' ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
+                  {msg.role === 'user' ? <User className="w-5 h-5" /> : <Lightbulb className="w-5 h-5" />}
                 </div>
                 <div className={`max-w-[80%] rounded-2xl p-4 ${
                   msg.role === 'user' 
@@ -376,11 +514,20 @@ export function InterviewPractice() {
                     : 'bg-white border border-gray-100 shadow-sm text-gray-900 rounded-tl-none'
                 }`}>
                   {msg.role === 'user' ? (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <p className="whitespace-pre-wrap">{msg.text}</p>
+                      {msg.mediaUrl && (
+                        <div className="mt-2 text-white bg-emerald-700/50 p-2 rounded-xl border border-emerald-500/30 overflow-hidden">
+                          {msg.isVideo ? (
+                            <video controls src={msg.mediaUrl} className="w-full max-h-48 rounded-lg" />
+                          ) : (
+                            <audio controls src={msg.mediaUrl} className="w-full h-8" />
+                          )}
+                        </div>
+                      )}
                       <button 
                         onClick={() => msg.feedback ? toggleFeedback(msg.id) : getFeedback(msg.id, msg.text, index)}
-                        className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider bg-white/20 hover:bg-white/30 px-2 py-1 rounded-md transition-colors"
+                        className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider bg-white/20 hover:bg-white/30 px-2 py-1 rounded-md transition-colors w-fit"
                       >
                         <Sparkles className="w-3 h-3" />
                         {msg.feedback ? (msg.showFeedback ? 'Hide Feedback' : 'Show Feedback') : 'Analyze Response'}
@@ -562,8 +709,8 @@ export function InterviewPractice() {
           ))}
           {isLoading && (
             <div className="flex gap-4">
-              <div className="w-10 h-10 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center shrink-0">
-                <Bot className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                <Lightbulb className="w-5 h-5" />
               </div>
               <div className="bg-white border border-gray-100 shadow-sm rounded-2xl rounded-tl-none p-4 flex items-center gap-2">
                 <Loader2 className="w-5 h-5 animate-spin text-emerald-500" />
@@ -577,25 +724,169 @@ export function InterviewPractice() {
 
       {/* Input area, only show if not viewing history list or old session */}
       {!showHistoryList && !viewingSessionId && (
-        <div className="p-4 border-t border-gray-200 bg-white">
-          <div className="flex items-center gap-2 max-w-4xl mx-auto">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              placeholder="Type your response..."
-              className="flex-1 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50 focus:bg-white transition-colors"
-              disabled={isLoading}
+        <div className="p-4 border-t border-gray-200 bg-white relative">
+          {/* Video Preview Overlay */}
+          <div 
+            className={`absolute bottom-full mb-4 right-4 bg-gray-900 rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 transform origin-bottom-right ${
+              isRecording && isVideoEnabled ? 'scale-100 opacity-100' : 'scale-0 opacity-0'
+            }`}
+            style={{ width: '240px', height: '180px' }}
+          >
+            <video 
+              ref={videoPreviewRef} 
+              autoPlay 
+              muted 
+              playsInline 
+              className="w-full h-full object-cover" 
             />
-            <button
-              onClick={handleSend}
-              disabled={!input.trim() || isLoading}
-              className="bg-emerald-600 text-white p-3 rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-md shadow-emerald-600/20"
-            >
-              <Send className="w-5 h-5" />
-            </button>
+            <div className="absolute top-2 right-2 flex items-center gap-1.5 bg-rose-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider">
+              <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+              {Math.floor(recordingTimeLeft / 60).toString().padStart(2, '0')}:{(recordingTimeLeft % 60).toString().padStart(2, '0')}
+            </div>
           </div>
+
+          {isStarPromptActive ? (
+            <div className="max-w-4xl mx-auto bg-emerald-50 p-6 rounded-2xl border border-emerald-100 shadow-lg shadow-emerald-900/5 space-y-5 mb-4 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
+                <Star className="w-48 h-48 text-emerald-900" />
+              </div>
+              <div className="relative z-10 space-y-5">
+                <div>
+                  <h3 className="text-lg font-black text-emerald-900 flex items-center gap-2">
+                    <Star className="w-5 h-5 text-emerald-600 fill-emerald-600" /> Structure Your Answer
+                  </h3>
+                  <p className="text-sm text-emerald-700 mt-1">You submitted: <span className="italic block mt-1 p-2 bg-white/50 rounded-lg border border-emerald-200">"{initialResponseText}"</span></p>
+                  <p className="text-sm text-emerald-800 mt-3 font-medium">Use the STAR method to make your answer stronger, or submit it as-is.</p>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-emerald-900 uppercase tracking-wider flex items-center justify-between">
+                      Situation
+                      <span className="text-[10px] text-emerald-600/70 lowercase font-medium tracking-normal">Set the scene</span>
+                    </label>
+                    <textarea 
+                      value={starData.situation}
+                      onChange={(e) => setStarData({...starData, situation: e.target.value})}
+                      placeholder="e.g., During my time at Company X..."
+                      className="w-full bg-white border border-emerald-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none placeholder:text-gray-400"
+                      rows={2}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-emerald-900 uppercase tracking-wider flex items-center justify-between">
+                      Task
+                      <span className="text-[10px] text-emerald-600/70 lowercase font-medium tracking-normal">Your responsibility</span>
+                    </label>
+                    <textarea 
+                      value={starData.task}
+                      onChange={(e) => setStarData({...starData, task: e.target.value})}
+                      placeholder="e.g., I was responsible for..."
+                      className="w-full bg-white border border-emerald-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none placeholder:text-gray-400"
+                      rows={2}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-emerald-900 uppercase tracking-wider flex items-center justify-between">
+                      Action
+                      <span className="text-[10px] text-emerald-600/70 lowercase font-medium tracking-normal">Steps you took</span>
+                    </label>
+                    <textarea 
+                      value={starData.action}
+                      onChange={(e) => setStarData({...starData, action: e.target.value})}
+                      placeholder="e.g., I implemented a new system by..."
+                      className="w-full bg-white border border-emerald-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none placeholder:text-gray-400"
+                      rows={3}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-emerald-900 uppercase tracking-wider flex items-center justify-between">
+                      Result
+                      <span className="text-[10px] text-emerald-600/70 lowercase font-medium tracking-normal">Impact & metrics</span>
+                    </label>
+                    <textarea 
+                      value={starData.result}
+                      onChange={(e) => setStarData({...starData, result: e.target.value})}
+                      placeholder="e.g., This led to a 20% increase in..."
+                      className="w-full bg-white border border-emerald-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none placeholder:text-gray-400"
+                      rows={3}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button 
+                    onClick={() => { setIsStarPromptActive(false); setInput(initialResponseText); setInitialResponseText(''); }}
+                    className="px-5 py-2.5 text-sm font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 rounded-xl transition-colors border border-emerald-200/50"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={handleSend}
+                    className="px-5 py-2.5 text-sm font-bold bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors shadow-md shadow-emerald-600/20 flex items-center gap-2"
+                  >
+                    <Send className="w-4 h-4" />
+                    Submit Final Answer
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3 max-w-4xl mx-auto">
+              <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsVideoEnabled(!isVideoEnabled)}
+                disabled={isRecording}
+                className={`p-3 rounded-xl transition-colors flex items-center justify-center shrink-0 border border-gray-200 ${
+                  isVideoEnabled 
+                    ? 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200' 
+                    : 'bg-white text-gray-400 hover:bg-gray-50'
+                } disabled:opacity-50`}
+                title={isVideoEnabled ? "Video enabled" : "Video disabled"}
+              >
+                {isVideoEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+              </button>
+
+              <button
+                onClick={toggleRecording}
+                className={`p-3 rounded-xl transition-colors flex items-center justify-center shrink-0 border border-transparent ${
+                  isRecording 
+                    ? 'bg-rose-100 text-rose-600 hover:bg-rose-200 animate-pulse border-rose-200' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-gray-200'
+                }`}
+                title={isRecording ? "Stop Recording" : "Start Voice Dictation"}
+              >
+                {isRecording ? <Square className="w-5 h-5 fill-current" /> : <Mic className="w-5 h-5" />}
+              </button>
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                placeholder={isRecording ? "Listening..." : "Type your response or use the microphone/camera..."}
+                className="flex-1 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50 focus:bg-white transition-colors"
+                disabled={isLoading}
+              />
+              <button
+                onClick={handleSend}
+                disabled={!input.trim() || isLoading}
+                className="bg-emerald-600 text-white p-3 rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-md shadow-emerald-600/20 shrink-0"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            </div>
+            {isRecording && (
+                <div className="flex items-center gap-2 justify-center mt-2">
+                  <div className="text-xs text-rose-600 bg-rose-50 px-2 py-1 rounded-md font-bold font-mono tracking-wider">
+                    {Math.floor(recordingTimeLeft / 60).toString().padStart(2, '0')}:{(recordingTimeLeft % 60).toString().padStart(2, '0')}
+                  </div>
+                  <div className="text-xs text-gray-500 animate-pulse font-medium">
+                    Recording {isVideoEnabled ? 'video and audio' : 'audio'}... Speak clearly. Press stop when finished.
+                  </div>
+                </div>
+            )}
+          </div>
+          )}
         </div>
       )}
     </div>

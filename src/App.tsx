@@ -12,7 +12,7 @@ import { SkillGapAnalyzer } from './components/SkillGapAnalyzer';
 import { CareerTools } from './components/CareerTools';
 import { JobTracker } from './components/JobTracker';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { auth, db, signInWithGoogle, logout } from './lib/firebase';
+import { auth, db, signInWithGoogle, logout, checkRedirectResult } from './lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { LogIn, Loader2, Briefcase, Sparkles, ShieldCheck, Zap, Globe } from 'lucide-react';
@@ -27,6 +27,12 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Check if we are returning from a redirect sign in
+    checkRedirectResult().catch(err => {
+      console.error("Redirect auth error:", err);
+      // We don't necessarily want to block the app, just log it.
+    });
+
     let unsubDoc: (() => void) | undefined;
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -77,7 +83,11 @@ export default function App() {
       await signInWithGoogle(preferredRole);
     } catch (error: any) {
       console.error("Sign in error:", error);
-      setAuthError(error.message || "An unexpected error occurred during sign in.");
+      if (error.code === 'auth/popup-blocked') {
+        setAuthError("Sign-in popup was blocked by your browser. Please click the 'Open App' icon (a square with an arrow) in the top right of this preview to open the app in a new tab, or allow popups for this site in your browser settings.");
+      } else {
+        setAuthError(error.message || "An unexpected error occurred during sign in.");
+      }
     } finally {
       setIsSigningIn(false);
     }
